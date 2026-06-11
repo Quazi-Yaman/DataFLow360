@@ -1,0 +1,70 @@
+CREATE DATABASE dataflow360;
+USE DATABASE dataflow360;
+CREATE SCHEMA raw;
+CREATE SCHEMA dev;
+USE SCHEMA raw;
+CREATE WAREHOUSE dataflow360_wh WAREHOUSE_SIZE = 'X-SMALL' AUTO_SUSPEND = 60 AUTO_RESUME = TRUE;
+USE WAREHOUSE dataflow360_wh;
+CREATE STAGE raw.s3_stage_dataflow360 URL = 's3://yaman-s3/Data 360: E-commerce/' CREDENTIALS = (
+    AWS_KEY_ID = 'XXXXXXXXXXXXXXXXXXX' AWS_SECRET_KEY = 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX' --iam
+) FILE_FORMAT = (
+    TYPE = 'CSV' FIELD_OPTIONALLY_ENCLOSED_BY = '"' SKIP_HEADER = 1 NULL_IF = ('NULL', 'null', '') EMPTY_FIELD_AS_NULL = TRUE DATE_FORMAT = 'YYYY-MM-DD'
+);
+LIST @raw.s3_stage_dataflow360;
+-- Should show 4 CSV files
+CREATE TABLE raw.customers (
+    customer_id VARCHAR(10),
+    first_name VARCHAR(100),
+    last_name VARCHAR(100),
+    email VARCHAR(200),
+    country VARCHAR(100),
+    city VARCHAR(100),
+    signup_date DATE
+);
+------------attribute mapping
+CREATE TABLE raw.products (
+    product_id VARCHAR(10),
+    product_name VARCHAR(200),
+    category VARCHAR(100),
+    cost_price NUMBER(10, 2),
+    selling_price NUMBER(10, 2)
+);
+CREATE TABLE raw.orders (
+    order_id VARCHAR(10),
+    customer_id VARCHAR(10),
+    order_date DATE,
+    status VARCHAR(50),
+    shipping_country VARCHAR(100),
+    total_amount NUMBER(10, 2)
+);
+CREATE TABLE raw.order_items (
+    item_id VARCHAR(10),
+    order_id VARCHAR(10),
+    product_id VARCHAR(10),
+    quantity NUMBER(5, 0),
+    unit_price NUMBER(10, 2)
+);
+COPY INTO raw.customers
+FROM
+    @raw.s3_stage_dataflow360/customers.csv FILE_FORMAT = (
+        TYPE = 'CSV' SKIP_HEADER = 1 FIELD_OPTIONALLY_ENCLOSED_BY = '"' NULL_IF =('NULL', 'null', '') EMPTY_FIELD_AS_NULL = TRUE
+    ) ON_ERROR = 'CONTINUE';
+copy into raw.products
+FROM
+    @raw.s3_stage_dataflow360/products.csv FILE_FORMAT = (
+        TYPE = 'CSV' SKIP_HEADER = 1 FIELD_OPTIONALLY_ENCLOSED_BY = '"' NULL_IF =('NULL', 'null', '') EMPTY_FIELD_AS_NULL = TRUE
+    ) ON_ERROR = 'CONTINUE';
+COPY INTO raw.orders
+FROM
+    @raw.s3_stage_dataflow360/orders.csv FILE_FORMAT = (
+        TYPE = 'CSV' SKIP_HEADER = 1 FIELD_OPTIONALLY_ENCLOSED_BY = '"' NULL_IF =('NULL', 'null', '') EMPTY_FIELD_AS_NULL = TRUE DATE_FORMAT = 'YYYY-MM-DD'
+    ) ON_ERROR = 'CONTINUE';
+COPY INTO raw.order_items
+FROM
+    @raw.s3_stage_dataflow360/order_items.csv FILE_FORMAT = (
+        TYPE = 'CSV' SKIP_HEADER = 1 FIELD_OPTIONALLY_ENCLOSED_BY = '"' NULL_IF =('NULL', 'null', '') EMPTY_FIELD_AS_NULL = TRUE
+    ) ON_ERROR = 'CONTINUE';
+select
+    *
+from
+    customers;
